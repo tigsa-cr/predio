@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="es-CR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Control de predio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --concrete:#E4E5E0; --panel:#FFFFFF; --panel-2:#F3F4F1;
+  --ink:#16222B; --ink-soft:#5C6C76; --line:#CBCEC8; --line-hard:#16222B;
+  --hivis:#F0A81E; --hivis-ink:#3B2A05;
+  --go:#15704A; --go-bg:#DDEFE4; --bad:#B4451F; --bad-bg:#F7E2DB;
+  --shadow:0 1px 0 rgba(22,34,43,.08);
+}
+:root:not([data-theme="light"]){
+  @media (prefers-color-scheme: dark){
+    --concrete:#12181B; --panel:#1B2227; --panel-2:#232B31;
+    --ink:#E8EBE8; --ink-soft:#93A2AB; --line:#2F3940; --line-hard:#4A575F;
+    --hivis:#F5B733; --hivis-ink:#241902;
+    --go:#66CD98; --go-bg:#16332A; --bad:#F2896A; --bad-bg:#3A211A; --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --concrete:#12181B; --panel:#1B2227; --panel-2:#232B31;
+  --ink:#E8EBE8; --ink-soft:#93A2AB; --line:#2F3940; --line-hard:#4A575F;
+  --hivis:#F5B733; --hivis-ink:#241902;
+  --go:#66CD98; --go-bg:#16332A; --bad:#F2896A; --bad-bg:#3A211A; --shadow:none;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--concrete);color:var(--ink);
+  font-family:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:"Barlow Condensed",system-ui,sans-serif;margin:0;font-weight:600;letter-spacing:.01em}
+button{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--hivis);outline-offset:2px}
+.hide{display:none !important}
+
+/* barra superior */
+.gate{border-bottom:2px solid var(--line-hard);background:var(--panel)}
+.gate__in{max-width:1200px;margin:0 auto;padding:13px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.gate__bars{width:32px;height:32px;flex:none;border-radius:3px;
+  background:repeating-linear-gradient(135deg,var(--hivis) 0 7px,var(--ink) 7px 14px)}
+.gate__name{font-size:25px;line-height:1}
+.gate__sub{color:var(--ink-soft);font-size:13.5px;margin-top:2px}
+.gate__spacer{flex:1 1 auto}
+.tally{display:flex;gap:22px;align-items:center}
+.tally div{font-family:"Barlow Condensed",sans-serif;text-align:right}
+.tally b{display:block;font-size:29px;line-height:1;font-weight:700}
+.tally b.on{color:var(--go)}
+.tally span{font-size:13px;color:var(--ink-soft);font-family:"Barlow",sans-serif}
+.salir{background:none;border:none;cursor:pointer;font-size:14px;font-weight:600;
+  color:var(--ink-soft);text-decoration:underline;padding:4px}
+.salir:hover{color:var(--ink)}
+
+/* aviso de conexión */
+.banner{padding:10px 20px;background:var(--bad-bg);color:var(--bad);
+  font-size:14px;font-weight:600;text-align:center;border-bottom:1px solid var(--line)}
+
+/* rejilla */
+.wrap{max-width:1200px;margin:0 auto;padding:22px 20px 64px;
+  display:grid;gap:22px;grid-template-columns:minmax(0,4.5fr) minmax(0,6fr);align-items:start}
+@media (max-width:920px){.wrap{grid-template-columns:1fr;padding:16px 14px 56px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:4px;box-shadow:var(--shadow)}
+
+/* formulario */
+.head{padding:16px 20px 0}
+.head h2{font-size:23px}
+.head p{margin:3px 0 0;color:var(--ink-soft);font-size:14px}
+form{padding:4px 20px 20px}
+.field{margin-top:16px}
+.field label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+.field label i{font-style:normal;font-weight:400;color:var(--ink-soft)}
+.field input{width:100%;padding:13px 14px;font:inherit;font-size:17px;
+  background:var(--panel);color:var(--ink);border:1.5px solid var(--line);border-radius:3px}
+.field input::placeholder{color:var(--ink-soft);opacity:.75}
+.field input:focus{border-color:var(--ink)}
+.hint{font-size:13px;color:var(--ink-soft);margin-top:6px}
+.hint.bad{color:var(--bad)}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.chip{padding:6px 12px;border:1.5px solid var(--line);background:transparent;
+  border-radius:999px;font-size:14px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.submit{margin-top:22px;width:100%;padding:16px;cursor:pointer;
+  background:var(--hivis);color:var(--hivis-ink);border:none;border-radius:3px;
+  font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:24px;letter-spacing:.02em}
+.submit:hover{filter:brightness(.95)}
+.submit:active{transform:translateY(1px)}
+.submit[disabled]{opacity:.55;cursor:progress}
+
+/* pase */
+.pase{padding:20px}
+.pase__stub{border:2px dashed var(--line-hard);border-radius:5px;padding:20px;
+  text-align:center;background:var(--panel-2)}
+.pase__folio{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;
+  letter-spacing:.14em;color:var(--ink-soft)}
+.pase__qr{background:#FFFFFF;padding:12px;border-radius:4px;display:inline-block;margin:12px 0 4px;line-height:0}
+.pase__qr canvas{display:block;width:186px;height:186px}
+.pase__nombre{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:28px;line-height:1.05;margin-top:10px}
+.pase__destino{font-size:16px;margin-top:2px}
+.pase__destino b{font-weight:600}
+.pase__msg{font-size:13.5px;color:var(--ink-soft);margin-top:12px;
+  border-top:1px solid var(--line);padding-top:12px}
+.pase__link{font-size:12px;color:var(--ink-soft);margin-top:9px;word-break:break-all;line-height:1.35}
+.pase__link b{display:block;font-weight:600;color:var(--ink);font-size:12.5px;margin-bottom:2px}
+.pase__link.aviso b{color:var(--bad)}
+.pase__acts{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.pase__acts > *{flex:1 1 140px}
+.btn{display:block;text-align:center;text-decoration:none;padding:12px 14px;cursor:pointer;
+  border:1.5px solid var(--line-hard);background:transparent;border-radius:3px;font-size:15px;font-weight:600}
+.btn:hover{background:var(--panel-2)}
+.btn--solid{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.btn--solid:hover{filter:brightness(1.25)}
+
+/* lista */
+.log__head{padding:15px 20px;border-bottom:1px solid var(--line);
+  display:flex;gap:11px;align-items:center;flex-wrap:wrap}
+.log__head h2{font-size:23px;flex:1 1 auto}
+.search{padding:9px 12px;font:inherit;font-size:15px;width:180px;
+  background:var(--panel-2);color:var(--ink);border:1.5px solid var(--line);border-radius:3px}
+.ghost{padding:9px 13px;background:transparent;border:1.5px solid var(--line);
+  border-radius:3px;cursor:pointer;font-size:14px;font-weight:600}
+.ghost:hover{border-color:var(--ink)}
+.tabs{display:flex;padding:0 20px;border-bottom:1px solid var(--line)}
+.tab{padding:11px 2px;margin-right:22px;background:none;border:none;cursor:pointer;
+  font-size:15px;font-weight:600;color:var(--ink-soft);border-bottom:3px solid transparent}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--hivis)}
+
+.row{display:grid;grid-template-columns:90px minmax(0,1fr) auto;gap:13px;align-items:center;
+  padding:12px 20px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:none}
+.row__hora{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:22px;
+  font-variant-numeric:tabular-nums;line-height:1.1}
+.row__hora small{display:block;font-family:"Barlow",sans-serif;font-size:12.5px;font-weight:500;
+  color:var(--ink-soft);letter-spacing:.01em;margin-top:1px}
+.row--espera .row__hora{color:var(--ink-soft);font-size:17px}
+.row__nombre{font-weight:600;font-size:16.5px;overflow-wrap:anywhere}
+.row__meta{font-size:13.5px;color:var(--ink-soft)}
+.row__right{display:flex;align-items:center;gap:9px;justify-self:end;flex-wrap:wrap}
+.acc{padding:6px 11px;border:1.5px solid var(--line);background:transparent;border-radius:3px;
+  cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.acc:hover{border-color:var(--ink)}
+.acc--go{color:var(--go);border-color:var(--go)}
+.acc--go:hover{background:var(--go-bg)}
+.acc--quitar:hover{border-color:var(--bad);color:var(--bad)}
+.dest{padding:4px 11px;border:1.5px solid var(--line-hard);border-radius:999px;
+  font-size:14px;font-weight:600;white-space:nowrap}
+.dest--on{background:var(--go-bg);border-color:transparent;color:var(--go)}
+.icon{width:34px;height:34px;flex:none;padding:0;cursor:pointer;border-radius:3px;
+  border:1.5px solid var(--line);background:transparent;font-size:15px;line-height:1}
+.icon:hover{border-color:var(--ink)}
+.icon--del:hover{border-color:var(--bad);color:var(--bad)}
+@media (max-width:520px){
+  .row{grid-template-columns:84px minmax(0,1fr);row-gap:9px}
+  .row__right{grid-column:1 / -1;justify-self:start}
+}
+.row.is-new{animation:land .5s ease-out}
+@keyframes land{0%{background:var(--hivis);transform:translateX(-10px)}100%{background:transparent;transform:none}}
+@media (prefers-reduced-motion:reduce){.row.is-new{animation:none}}
+.empty{padding:34px 20px;text-align:center;color:var(--ink-soft)}
+.empty b{display:block;font-family:"Barlow Condensed",sans-serif;font-size:20px;
+  color:var(--ink);font-weight:600;margin-bottom:4px}
+
+/* pantallas completas */
+.screen{position:fixed;inset:0;z-index:30;background:var(--concrete);
+  overflow-y:auto;padding:26px 18px;display:flex;align-items:flex-start;justify-content:center}
+.screen__box{width:100%;max-width:430px;background:var(--panel);
+  border:1px solid var(--line);border-radius:5px;padding:24px;text-align:center}
+.screen__eyebrow{font-size:14px;color:var(--ink-soft)}
+.screen__nombre{font-family:"Barlow Condensed",sans-serif;font-weight:700;
+  font-size:36px;line-height:1.03;margin:6px 0 4px}
+.screen__dest{font-size:17px;margin-bottom:6px}
+.screen__folio{font-family:"Barlow Condensed",sans-serif;letter-spacing:.14em;
+  font-weight:700;color:var(--ink-soft);font-size:18px}
+.screen__ok{margin:18px 0 6px;padding:14px;border-radius:3px;background:var(--go-bg);color:var(--go);
+  font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:23px;line-height:1.15}
+.screen__err{margin:16px 0 0;padding:12px;border-radius:3px;background:var(--bad-bg);
+  color:var(--bad);font-size:14.5px;font-weight:600}
+.screen__acts{margin-top:18px;display:flex;flex-direction:column;gap:9px}
+.screen p.nota{color:var(--ink-soft);font-size:14.5px;text-align:left;line-height:1.5}
+.screen code{background:var(--panel-2);padding:2px 5px;border-radius:3px;font-size:13px;word-break:break-all}
+.big{padding:17px;font-family:"Barlow Condensed",sans-serif;font-size:25px;font-weight:700;
+  border:none;border-radius:3px;background:var(--hivis);color:var(--hivis-ink);cursor:pointer}
+.big:hover{filter:brightness(.95)}
+.big[disabled]{opacity:.55;cursor:progress}
+.screen .field{text-align:left}
+
+/* aviso flotante */
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);
+  background:var(--ink);color:var(--concrete);padding:11px 14px;border-radius:3px;
+  font-size:15px;font-weight:500;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:40;
+  opacity:0;pointer-events:none;transition:opacity .18s ease;
+  max-width:calc(100% - 28px);display:flex;align-items:center;gap:14px}
+.toast.on{opacity:1;pointer-events:auto}
+.toast button{background:none;border:none;color:var(--hivis);font-weight:600;
+  cursor:pointer;text-decoration:underline;padding:0;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+
+<div id="consola" class="hide">
+<header class="gate">
+  <div class="gate__in">
+    <div class="gate__bars" aria-hidden="true"></div>
+    <div>
+      <h1 class="gate__name">Control de predio</h1>
+      <div class="gate__sub" id="quien">Lo que hay en el predio ahora mismo</div>
+    </div>
+    <div class="gate__spacer"></div>
+    <div class="tally">
+      <div><b class="on" id="nEnPredio">0</b><span>en predio</span></div>
+      <div><b id="nEspera">0</b><span>por llegar</span></div>
+      <button class="salir" id="btnSalir" type="button">Salir</button>
+    </div>
+  </div>
+</header>
+<div class="banner hide" id="banner"></div>
+
+<main class="wrap">
+  <section class="card">
+    <div id="formWrap">
+      <div class="head">
+        <h2>Agendar unidad</h2>
+        <p>Se genera un pase con código QR para mandarle al piloto.</p>
+      </div>
+      <form id="form" autocomplete="off">
+        <div class="field">
+          <label for="nombre">Nombre del piloto</label>
+          <input id="nombre" type="text" placeholder="Ej. Carlos Jiménez Mora">
+          <div class="hint bad hide" id="nombreErr">Escriba el nombre del piloto.</div>
+        </div>
+        <div class="field">
+          <label for="destino">Destino de la carga</label>
+          <input id="destino" type="text" placeholder="Escriba o toque uno de abajo">
+          <div class="chips" id="chips"></div>
+          <div class="hint bad hide" id="destinoErr">Indique el destino.</div>
+        </div>
+        <div class="field">
+          <label for="empresa">Empresa o contacto <i>— opcional</i></label>
+          <input id="empresa" type="text" placeholder="Transportes del Istmo / Ing. Salas">
+        </div>
+        <button class="submit" id="btnGenerar" type="submit">Generar pase</button>
+      </form>
+    </div>
+
+    <div id="paseWrap" class="pase hide">
+      <div class="pase__stub">
+        <div class="pase__folio" id="pFolio">—</div>
+        <div class="pase__qr" id="pQR"></div>
+        <div class="pase__nombre" id="pNombre">—</div>
+        <div class="pase__destino">Destino: <b id="pDestino">—</b></div>
+        <div class="pase__msg">El piloto muestra este código en el portón. Al escanearlo, la unidad queda en predio con la fecha y hora exactas.</div>
+        <div class="pase__link" id="pLink"></div>
+      </div>
+      <div class="pase__acts">
+        <a class="btn btn--solid" id="pWA" target="_blank" rel="noopener">Enviar por WhatsApp</a>
+        <button class="btn" id="pCopiar" type="button">Copiar enlace</button>
+      </div>
+      <div class="pase__acts">
+        <button class="btn" id="pAbrir" type="button">Ver pase completo</button>
+        <button class="btn" id="pNueva" type="button">Agendar otra</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="log__head">
+      <h2>Unidades</h2>
+      <input class="search" id="search" type="search" placeholder="Buscar piloto o destino" aria-label="Buscar">
+      <button class="ghost" id="copiarLista" type="button">Copiar lista</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-f="predio" aria-selected="true">En predio</button>
+      <button class="tab" role="tab" data-f="espera" aria-selected="false">Por llegar</button>
+      <button class="tab" role="tab" data-f="todas" aria-selected="false">Todas</button>
+    </div>
+    <div id="list"><div class="empty">Cargando…</div></div>
+  </section>
+</main>
+</div>
+
+<div class="screen hide" id="screen"><div class="screen__box" id="screenBox"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ==========================================================================
+   CONFIGURACIÓN — pegue aquí los dos datos de Supabase
+   Project Settings → API
+   ========================================================================== */
+const SUPABASE_URL = "https://kqgdoupjtgpbgzihnxyy.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxZ2RvdXBqdGdwYmd6aWhueHl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NzM4MjcsImV4cCI6MjEwNDQ0OTgyN30.GJaCEFc1nZjo_0idK5QrCO0CNohrNmaoV8kiAtBx6CY";   // ← borre esto y pegue la llave, sin quitar las comillas
+/* ========================================================================== */
+
+(function(){
+  "use strict";
+
+  const DESTINOS = ["Panamá","Nicaragua","El Salvador","Guatemala","San Pedro Sula","Tegucigalpa"];
+  const ALFA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const DOMINIO_DEMO = "https://su-usuario.github.io/predio/";
+
+  const $ = id => document.getElementById(id);
+
+  let sb = null;
+  let sesion = null;
+  let unidades = [];
+  let filtro = "predio";
+  let paseActual = null;
+  let canal = null;
+  let borrado = null, tBorrado;
+
+  /* ---------- fechas ---------- */
+  const fHora  = new Intl.DateTimeFormat("es-CR",{hour:"2-digit",minute:"2-digit",hour12:false});
+  const fDia   = new Intl.DateTimeFormat("es-CR",{weekday:"long",day:"numeric",month:"long"});
+  const fCorta = new Intl.DateTimeFormat("es-CR",{day:"numeric",month:"short"});
+  const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+  const selloLargo = iso => cap(fDia.format(new Date(iso))) + ", " + fHora.format(new Date(iso));
+
+  /* ---------- direcciones ---------- */
+  const enServidor = () => location.protocol === "http:" || location.protocol === "https:";
+  const base = () => enServidor() ? location.origin + location.pathname : DOMINIO_DEMO;
+
+  function linkLlegada(u){ return base() + "#llegada?id=" + encodeURIComponent(u.id); }
+  function linkPase(u){
+    const p = new URLSearchParams({ id:u.id, f:u.folio, n:u.nombre, d:u.destino });
+    return base() + "#pase?" + p.toString();
+  }
+  function hashPartes(){
+    const h = location.hash.replace(/^#/,"");
+    const i = h.indexOf("?");
+    return {
+      ruta: i < 0 ? h : h.slice(0,i),
+      par: new URLSearchParams(i < 0 ? "" : h.slice(i+1))
+    };
+  }
+
+  function nuevoFolio(){
+    const usados = unidades.map(u => u.folio);
+    let f;
+    do{
+      f = "";
+      for(let i=0;i<4;i++) f += ALFA.charAt(Math.floor(Math.random()*ALFA.length));
+    }while(usados.includes(f));
+    return f;
+  }
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+
+  /* ---------- aviso flotante ---------- */
+  let tToast;
+  function toast(msg, accion, fn){
+    const t = $("toast");
+    t.innerHTML = "";
+    t.appendChild(document.createTextNode(msg));
+    if(accion){
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = accion;
+      b.addEventListener("click", () => { t.classList.remove("on"); fn(); });
+      t.appendChild(b);
+    }
+    t.classList.add("on");
+    clearTimeout(tToast);
+    tToast = setTimeout(() => t.classList.remove("on"), accion ? 7000 : 2800);
+  }
+  function banner(msg){
+    const b = $("banner");
+    if(!msg){ b.classList.add("hide"); return; }
+    b.textContent = msg;
+    b.classList.remove("hide");
+  }
+
+  /* ---------- pantallas completas ---------- */
+  function abrirScreen(html){
+    $("screenBox").innerHTML = html;
+    $("screen").classList.remove("hide");
+    $("consola").classList.add("hide");
+  }
+  function irConsola(){
+    if(location.hash) history.replaceState(null,"",base());
+    rutear();
+  }
+
+  /* ---------- QR ---------- */
+  function pintarQR(cont, texto){
+    cont.innerHTML = "";
+    if(typeof QRious === "undefined"){
+      cont.style.padding = "14px";
+      cont.innerHTML = '<div style="font:400 12px Barlow,sans-serif;color:#16222B;max-width:200px;'+
+        'word-break:break-all;line-height:1.4">No cargó el generador de códigos. Enlace:<br>'+esc(texto)+'</div>';
+      return;
+    }
+    const c = document.createElement("canvas");
+    cont.appendChild(c);
+    new QRious({ element:c, value:texto, size:560, level:"M", background:"#FFFFFF", foreground:"#16222B" });
+  }
+
+  /* ==========================================================
+     BASE DE DATOS
+     ========================================================== */
+  function conectar(){
+    if(!SUPABASE_URL || !SUPABASE_ANON_KEY) return false;
+    if(typeof window.supabase === "undefined") return false;
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    return true;
+  }
+
+  async function cargar(){
+    const { data, error } = await sb.from("unidades").select("*").order("creado",{ascending:false});
+    if(error){ banner("No se pudo leer la lista: "+error.message); return; }
+    banner("");
+    unidades = data || [];
+  }
+
+  function escuchar(){
+    if(canal) return;
+    canal = sb.channel("predio")
+      .on("postgres_changes", { event:"*", schema:"public", table:"unidades" }, async () => {
+        await cargar();
+        render();
+      })
+      .subscribe();
+  }
+  function dejarDeEscuchar(){
+    if(canal){ sb.removeChannel(canal); canal = null; }
+  }
+
+  /* ==========================================================
+     LISTA
+     ========================================================== */
+  function render(nuevoId){
+    if(!$("consola") || $("consola").classList.contains("hide")) { /* igual actualiza contadores */ }
+    const q = ($("search").value||"").trim().toLowerCase();
+    const list = $("list");
+
+    $("nEnPredio").textContent = unidades.filter(u => u.llegada).length;
+    $("nEspera").textContent   = unidades.filter(u => !u.llegada).length;
+
+    let vis = unidades.slice();
+    if(filtro === "predio") vis = vis.filter(u => u.llegada);
+    if(filtro === "espera") vis = vis.filter(u => !u.llegada);
+    if(q) vis = vis.filter(u =>
+      (u.nombre+" "+u.destino+" "+(u.empresa||"")+" "+u.folio).toLowerCase().includes(q));
+    vis.sort((a,b) => (b.llegada||b.creado).localeCompare(a.llegada||a.creado));
+
+    list.innerHTML = "";
+    if(!vis.length){
+      const e = document.createElement("div");
+      e.className = "empty";
+      e.innerHTML = q ? "<b>Sin resultados</b>Nada coincide con esa búsqueda."
+        : filtro === "predio" ? "<b>No hay unidades en predio</b>Aparecen aquí cuando el oficial escanea su pase."
+        : filtro === "espera" ? "<b>No hay unidades por llegar</b>Agende una y mándele el pase al piloto."
+        : "<b>El predio está vacío</b>Empiece agendando la primera unidad.";
+      list.appendChild(e);
+      return;
+    }
+
+    vis.forEach(u => {
+      const row = document.createElement("div");
+      row.className = "row" + (u.llegada ? "" : " row--espera") + (u.id === nuevoId ? " is-new" : "");
+      const dentro = !!u.llegada;
+      row.innerHTML =
+        '<div class="row__hora"></div>'+
+        '<div><div class="row__nombre"></div><div class="row__meta"></div></div>'+
+        '<div class="row__right">'+
+          '<span class="dest"></span>'+
+          '<button class="icon icon--pase" type="button" title="Ver pase" aria-label="Ver pase">▣</button>'+
+          (dentro ? '<button class="acc acc--go" data-a="asignar" type="button">Asignar</button>' : '')+
+          '<button class="acc acc--quitar" data-a="quitar" type="button">'+(dentro ? "Retirar" : "Cancelar")+'</button>'+
+        '</div>';
+
+      const hora = row.querySelector(".row__hora");
+      if(u.llegada){
+        hora.innerHTML = fHora.format(new Date(u.llegada))+"<small>"+fCorta.format(new Date(u.llegada))+"</small>";
+        hora.title = "Ingresó al predio el "+selloLargo(u.llegada);
+      } else {
+        hora.innerHTML = "—<small>por llegar</small>";
+        hora.title = "Agendada el "+selloLargo(u.creado);
+      }
+      row.querySelector(".row__nombre").textContent = u.nombre;
+      row.querySelector(".row__meta").textContent = u.folio + (u.empresa ? "  ·  "+u.empresa : "");
+      const dest = row.querySelector(".dest");
+      dest.textContent = u.destino;
+      if(u.llegada) dest.className = "dest dest--on";
+      row.querySelector(".icon--pase").addEventListener("click", () => verPase(u.id));
+      const bAsignar = row.querySelector('[data-a="asignar"]');
+      if(bAsignar) bAsignar.addEventListener("click", () => quitar(u.id, "asignada"));
+      row.querySelector('[data-a="quitar"]')
+        .addEventListener("click", () => quitar(u.id, dentro ? "retirada" : "cancelada"));
+      list.appendChild(row);
+    });
+  }
+
+  /* ---------- sacar del tablero, con deshacer ---------- */
+  const AVISO = {
+    asignada:   n => "Se asignó carga a "+n+".",
+    retirada:   n => "Se retiró a "+n+" del predio.",
+    cancelada:  n => "Se canceló el pase de "+n+"."
+  };
+
+  async function quitar(id, motivo){
+    const u = unidades.find(x => x.id === id);
+    if(!u) return;
+    const { error } = await sb.from("unidades").delete().eq("id", id);
+    if(error){ toast("No se pudo sacar del tablero: "+error.message); return; }
+    borrado = u;
+    unidades = unidades.filter(x => x.id !== id);
+    render();
+    toast(AVISO[motivo](u.nombre), "Deshacer", async () => {
+      if(!borrado) return;
+      const copia = borrado; borrado = null;
+      const { error:e2 } = await sb.from("unidades").insert(copia);
+      if(e2){ toast("No se pudo restaurar: "+e2.message); return; }
+      await cargar(); render();
+      toast("Se restauró "+copia.nombre+" en el tablero.");
+    });
+    clearTimeout(tBorrado);
+    tBorrado = setTimeout(() => { borrado = null; }, 7200);
+  }
+
+  /* ---------- pase ---------- */
+  function mostrarPase(u){
+    paseActual = u;
+    $("pFolio").textContent = "Pase " + u.folio;
+    $("pNombre").textContent = u.nombre;
+    $("pDestino").textContent = u.destino;
+    pintarQR($("pQR"), linkLlegada(u));
+
+    const el = $("pLink");
+    if(enServidor()){
+      el.className = "pase__link";
+      el.innerHTML = "<b>El QR abre esta dirección:</b>" + esc(linkLlegada(u));
+    } else {
+      el.className = "pase__link aviso";
+      el.innerHTML = "<b>Todavía sin dirección pública</b>La página no está publicada en internet, "+
+        "así que el QR apunta a una dirección de ejemplo y no abrirá nada al escanearlo.";
+    }
+
+    const texto = "Pase de entrada al predio\n\nPiloto: "+u.nombre+"\nDestino: "+u.destino+
+      "\nPase: "+u.folio+"\n\nMuestre este código en el portón:\n"+linkPase(u);
+    $("pWA").href = "https://wa.me/?text=" + encodeURIComponent(texto);
+
+    $("formWrap").classList.add("hide");
+    $("paseWrap").classList.remove("hide");
+  }
+  function verPase(id){
+    const u = unidades.find(x => x.id === id);
+    if(!u) return;
+    mostrarPase(u);
+    window.scrollTo({ top:0, behavior:"smooth" });
+  }
+  function volverForm(){
+    paseActual = null;
+    $("paseWrap").classList.add("hide");
+    $("formWrap").classList.remove("hide");
+    $("nombre").focus();
+  }
+
+  /* ==========================================================
+     PANTALLAS
+     ========================================================== */
+  function pantallaConfig(){
+    abrirScreen(
+      '<div class="screen__eyebrow">Falta configurar la conexión</div>'+
+      '<div class="screen__nombre">La página no está conectada a Supabase</div>'+
+      '<p class="nota">Abra este archivo con un editor de texto y llene las dos líneas que están al inicio '+
+      'del bloque <code>&lt;script&gt;</code>:</p>'+
+      '<p class="nota"><code>const SUPABASE_URL = "…";</code><br><code>const SUPABASE_ANON_KEY = "…";</code></p>'+
+      '<p class="nota">Los dos datos están en Supabase, en Project Settings → API.</p>');
+  }
+
+  function pantallaLogin(){
+    abrirScreen(
+      '<div class="screen__eyebrow">Control de predio</div>'+
+      '<div class="screen__nombre">Inicie sesión</div>'+
+      '<p class="nota" style="text-align:center">Use la cuenta que le asignaron.</p>'+
+      '<div class="field"><label for="lEmail">Correo</label>'+
+      '<input id="lEmail" type="email" inputmode="email" autocomplete="username" placeholder="seguridad@tigcr.com"></div>'+
+      '<div class="field"><label for="lPass">Contraseña</label>'+
+      '<input id="lPass" type="password" autocomplete="current-password" placeholder="••••••••"></div>'+
+      '<div class="screen__err hide" id="lErr"></div>'+
+      '<div class="screen__acts"><button class="big" id="lEntrar" type="button">Entrar</button></div>');
+
+    const fallo = msg => {
+      const e = $("lErr");
+      e.textContent = msg;
+      e.classList.remove("hide");
+      const btn = $("lEntrar");
+      btn.disabled = false;
+      btn.textContent = "Entrar";
+      $("lPass").value = "";
+      $("lPass").focus();
+    };
+
+    const entrar = async () => {
+      const btn = $("lEntrar");
+      const email = $("lEmail").value.trim();
+      const pass = $("lPass").value;
+      if(!email || !pass){ fallo("Escriba el correo y la contraseña."); return; }
+      $("lErr").classList.add("hide");
+      btn.disabled = true; btn.textContent = "Entrando…";
+      const { error } = await sb.auth.signInWithPassword({ email, password:pass });
+      if(error){ fallo("No se pudo entrar. Supabase dice: "+error.message); return; }
+      // onAuthStateChange se encarga de redibujar
+    };
+    $("lEntrar").addEventListener("click", entrar);
+    $("lEmail").addEventListener("keydown", e => { if(e.key === "Enter") $("lPass").focus(); });
+    $("lPass").addEventListener("keydown", e => { if(e.key === "Enter") entrar(); });
+    $("lEmail").focus();
+  }
+
+  async function pantallaLlegada(id){
+    if(!id) return irConsola();
+
+    abrirScreen('<div class="screen__eyebrow">Buscando la unidad…</div>');
+    const { data, error } = await sb.from("unidades").select("*").eq("id", id).maybeSingle();
+
+    if(error || !data){
+      abrirScreen(
+        '<div class="screen__eyebrow">Pase no válido</div>'+
+        '<div class="screen__nombre">Esta unidad ya no está en el sistema</div>'+
+        '<p class="nota">Puede que se haya eliminado del tablero, o que el código sea de otro predio.</p>'+
+        '<div class="screen__acts"><button class="btn" id="sVolver" type="button">Volver al tablero</button></div>');
+      $("sVolver").addEventListener("click", irConsola);
+      return;
+    }
+
+    let u = data;
+    const pintar = () => {
+      const yaLlego = !!u.llegada;
+      abrirScreen(
+        '<div class="screen__eyebrow">'+(yaLlego ? "Unidad en predio" : "Llegada al portón")+'</div>'+
+        '<div class="screen__nombre">'+esc(u.nombre)+'</div>'+
+        '<div class="screen__dest">Destino: <b>'+esc(u.destino)+'</b></div>'+
+        (u.empresa ? '<div class="screen__dest" style="color:var(--ink-soft);font-size:15px">'+esc(u.empresa)+'</div>' : '')+
+        '<div class="screen__folio">'+esc(u.folio)+'</div>'+
+        (yaLlego
+          ? '<div class="screen__ok">Ingresó al predio<br>'+selloLargo(u.llegada)+'</div>'+
+            '<p class="nota" style="text-align:center">En espera de viaje.</p>'
+          : '')+
+        '<div class="screen__acts">'+
+          (yaLlego ? '' : '<button class="big" id="sConfirmar" type="button">Confirmar llegada</button>')+
+          '<button class="btn" id="sVolver" type="button">Volver al tablero</button>'+
+        '</div>');
+      $("sVolver").addEventListener("click", irConsola);
+      const c = $("sConfirmar");
+      if(c) c.addEventListener("click", async () => {
+        c.disabled = true; c.textContent = "Registrando…";
+        const { data:res, error:err } = await sb.rpc("marcar_llegada", { p_id: u.id });
+        if(err){
+          c.disabled = false; c.textContent = "Confirmar llegada";
+          toast("No se pudo registrar: "+err.message);
+          return;
+        }
+        if(res && res.length){ u = res[0]; }
+        else {
+          const { data:r2 } = await sb.from("unidades").select("*").eq("id", u.id).maybeSingle();
+          if(r2) u = r2;
+        }
+        pintar();
+      });
+    };
+    pintar();
+  }
+
+  function pantallaPase(par){
+    const id = par.get("id"), folio = par.get("f") || "", nombre = par.get("n") || "", destino = par.get("d") || "";
+    if(!id){ irConsola(); return; }
+    abrirScreen(
+      '<div class="screen__eyebrow">Pase de entrada al predio</div>'+
+      '<div class="screen__nombre">'+esc(nombre)+'</div>'+
+      '<div class="screen__dest">Destino: <b>'+esc(destino)+'</b></div>'+
+      '<div class="screen__folio">'+esc(folio)+'</div>'+
+      '<div class="pase__qr" id="sQR" style="margin:16px 0 6px"></div>'+
+      '<p class="nota" style="text-align:center">Muestre este código al oficial en el portón.</p>');
+    pintarQR($("sQR"), base()+"#llegada?id="+encodeURIComponent(id));
+  }
+
+  async function pantallaConsola(){
+    $("screen").classList.add("hide");
+    $("consola").classList.remove("hide");
+    $("quien").textContent = sesion && sesion.user ? sesion.user.email : "Lo que hay en el predio ahora mismo";
+    await cargar();
+    render();
+    escuchar();
+  }
+
+  /* ==========================================================
+     RUTAS
+     ========================================================== */
+  async function rutear(){
+    const { ruta, par } = hashPartes();
+
+    if(ruta === "pase"){ dejarDeEscuchar(); return pantallaPase(par); }
+    if(!sb){ dejarDeEscuchar(); return pantallaConfig(); }
+    if(!sesion){ dejarDeEscuchar(); return pantallaLogin(); }
+    if(ruta === "llegada"){ dejarDeEscuchar(); return pantallaLlegada(par.get("id")); }
+    return pantallaConsola();
+  }
+
+  /* ==========================================================
+     EVENTOS
+     ========================================================== */
+  function pintarChips(){
+    const c = $("chips"); c.innerHTML = "";
+    DESTINOS.forEach(d => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.textContent = d;
+      b.setAttribute("aria-pressed","false");
+      b.addEventListener("click", () => { $("destino").value = d; marcarChips(); });
+      c.appendChild(b);
+    });
+  }
+  function marcarChips(){
+    const v = $("destino").value.trim().toLowerCase();
+    [...$("chips").children].forEach(b =>
+      b.setAttribute("aria-pressed", b.textContent.toLowerCase() === v ? "true" : "false"));
+  }
+
+  $("destino").addEventListener("input", marcarChips);
+  $("search").addEventListener("input", () => render());
+
+  document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", () => {
+      filtro = t.dataset.f;
+      document.querySelectorAll(".tab").forEach(x =>
+        x.setAttribute("aria-selected", x === t ? "true" : "false"));
+      render();
+    });
+  });
+  function irTab(f){
+    filtro = f;
+    document.querySelectorAll(".tab").forEach(x =>
+      x.setAttribute("aria-selected", x.dataset.f === f ? "true" : "false"));
+  }
+
+  $("form").addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const nombre = $("nombre").value.trim();
+    const destino = $("destino").value.trim();
+    const empresa = $("empresa").value.trim();
+    $("nombreErr").classList.toggle("hide", !!nombre);
+    $("destinoErr").classList.toggle("hide", !!destino);
+    if(!nombre){ $("nombre").focus(); return; }
+    if(!destino){ $("destino").focus(); return; }
+
+    const btn = $("btnGenerar");
+    btn.disabled = true; btn.textContent = "Generando…";
+
+    const { data, error } = await sb.from("unidades")
+      .insert({ folio:nuevoFolio(), nombre, destino, empresa: empresa || null })
+      .select().single();
+
+    btn.disabled = false; btn.textContent = "Generar pase";
+    if(error){ toast("No se pudo guardar: "+error.message); return; }
+
+    $("form").reset(); marcarChips();
+    await cargar();
+    irTab("espera");
+    render(data.id);
+    mostrarPase(data);
+    toast("Pase "+data.folio+" listo para "+data.nombre+".");
+  });
+
+  $("pNueva").addEventListener("click", volverForm);
+  $("pAbrir").addEventListener("click", () => {
+    if(!paseActual) return;
+    location.hash = linkPase(paseActual).split("#")[1] ? "#"+linkPase(paseActual).split("#")[1] : "";
+  });
+  $("pCopiar").addEventListener("click", () => {
+    if(!paseActual) return;
+    const link = linkPase(paseActual);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(link).then(
+        () => toast("Enlace del pase copiado."),
+        () => toast("No se pudo copiar en este navegador."));
+    } else toast("No se pudo copiar en este navegador.");
+  });
+
+  $("copiarLista").addEventListener("click", () => {
+    const enPredio = unidades.filter(u => u.llegada).sort((a,b) => a.llegada.localeCompare(b.llegada));
+    const espera = unidades.filter(u => !u.llegada);
+    if(!enPredio.length && !espera.length){ toast("No hay unidades para copiar."); return; }
+
+    const ahora = new Date();
+    let t = "Estado del predio — "+cap(fDia.format(ahora))+", "+fHora.format(ahora)+"\n";
+    if(enPredio.length){
+      t += "\nEn predio ("+enPredio.length+"):";
+      enPredio.forEach(u => {
+        t += "\n"+fCorta.format(new Date(u.llegada))+"  "+fHora.format(new Date(u.llegada))+
+             "  "+u.nombre+"  →  "+u.destino+(u.empresa ? "  ("+u.empresa+")" : "");
+      });
+    }
+    if(espera.length){
+      t += "\n\nPor llegar ("+espera.length+"):";
+      espera.forEach(u => { t += "\n"+u.folio+"  "+u.nombre+"  →  "+u.destino; });
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(
+        () => toast("Lista copiada. Ya la puede pegar en WhatsApp."),
+        () => toast("No se pudo copiar en este navegador."));
+    } else toast("No se pudo copiar en este navegador.");
+  });
+
+  $("btnSalir").addEventListener("click", async () => {
+    dejarDeEscuchar();
+    await sb.auth.signOut();
+  });
+
+  window.addEventListener("hashchange", rutear);
+
+  /* ==========================================================
+     ARRANQUE
+     ========================================================== */
+  (async function(){
+    pintarChips();
+    if(!conectar()){ pantallaConfig(); return; }
+
+    const { data } = await sb.auth.getSession();
+    sesion = data ? data.session : null;
+
+    sb.auth.onAuthStateChange((_evento, s) => {
+      sesion = s;
+      if(!s) dejarDeEscuchar();
+      rutear();
+    });
+
+    rutear();
+  })();
+})();
+</script>
+</body>
+</html>
