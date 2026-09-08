@@ -318,7 +318,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   const DESTINOS = ["Panamá","Nicaragua","El Salvador","Guatemala","San Pedro Sula","Tegucigalpa"];
   const ALFA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const DOMINIO_DEMO = "https://su-usuario.github.io/predio/";
+  const DOMINIO_DEMO = "https://tigsa-cr.github.io/predio/";
 
   const $ = id => document.getElementById(id);
 
@@ -571,8 +571,8 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       el.innerHTML = "<b>El QR abre esta dirección:</b>" + esc(linkLlegada(u));
     } else {
       el.className = "pase__link aviso";
-      el.innerHTML = "<b>Todavía sin dirección pública</b>La página no está publicada en internet, "+
-        "así que el QR apunta a una dirección de ejemplo y no abrirá nada al escanearlo.";
+      el.innerHTML = "<b>Está trabajando en el archivo local</b>El QR apunta a la página publicada "+
+        "y sí funciona, pero es mejor generar los pases desde tigsa-cr.github.io/predio/.";
     }
 
     const texto = "Pase de entrada al predio\n\nPiloto: "+u.nombre+"\nDestino: "+u.destino+
