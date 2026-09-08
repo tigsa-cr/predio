@@ -97,6 +97,12 @@ form{padding:4px 20px 20px}
 
 /* pase */
 .pase{padding:20px}
+.pase__nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.pase__nav span{font-size:14px;color:var(--ink-soft);font-weight:600}
+.navb{width:46px;height:36px;flex:none;border:1.5px solid var(--line);background:transparent;
+  border-radius:3px;cursor:pointer;font-size:13px;line-height:1}
+.navb:hover{border-color:var(--ink)}
+.navb[disabled]{opacity:.3;cursor:default}
 .pase__stub{border:2px dashed var(--line-hard);border-radius:5px;padding:20px;
   text-align:center;background:var(--panel-2)}
 .pase__folio{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;
@@ -252,6 +258,11 @@ form{padding:4px 20px 20px}
     </div>
 
     <div id="paseWrap" class="pase hide">
+      <div class="pase__nav">
+        <button class="navb" id="pAnt" type="button" aria-label="Pase anterior">◀</button>
+        <span id="pPos"></span>
+        <button class="navb" id="pSig" type="button" aria-label="Pase siguiente">▶</button>
+      </div>
       <div class="pase__stub">
         <div class="pase__folio" id="pFolio">—</div>
         <div class="pase__qr" id="pQR"></div>
@@ -265,7 +276,10 @@ form{padding:4px 20px 20px}
         <button class="btn" id="pCopiar" type="button">Copiar enlace</button>
       </div>
       <div class="pase__acts">
+        <button class="btn" id="pCopiarQR" type="button">Copiar imagen QR</button>
         <button class="btn" id="pAbrir" type="button">Ver pase completo</button>
+      </div>
+      <div class="pase__acts">
         <button class="btn" id="pNueva" type="button">Agendar otra</button>
       </div>
     </div>
@@ -313,6 +327,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   let unidades = [];
   let filtro = "predio";
   let paseActual = null;
+  let visibles = [];
   let canal = null;
   let borrado = null, tBorrado;
 
@@ -448,6 +463,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     if(q) vis = vis.filter(u =>
       (u.nombre+" "+u.destino+" "+(u.empresa||"")+" "+u.folio).toLowerCase().includes(q));
     vis.sort((a,b) => (b.llegada||b.creado).localeCompare(a.llegada||a.creado));
+    visibles = vis;
 
     list.innerHTML = "";
     if(!vis.length){
@@ -471,7 +487,9 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
         '<div class="row__right">'+
           '<span class="dest"></span>'+
           '<button class="icon icon--pase" type="button" title="Ver pase" aria-label="Ver pase">▣</button>'+
-          (dentro ? '<button class="acc acc--go" data-a="asignar" type="button">Asignar</button>' : '')+
+          (dentro
+            ? '<button class="acc acc--go" data-a="asignar" type="button">Asignar</button>'
+            : '<button class="acc acc--go" data-a="llego" type="button">Ingresó</button>')+
           '<button class="acc acc--quitar" data-a="quitar" type="button">'+(dentro ? "Retirar" : "Cancelar")+'</button>'+
         '</div>';
 
@@ -491,10 +509,25 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       row.querySelector(".icon--pase").addEventListener("click", () => verPase(u.id));
       const bAsignar = row.querySelector('[data-a="asignar"]');
       if(bAsignar) bAsignar.addEventListener("click", () => quitar(u.id, "asignada"));
+      const bLlego = row.querySelector('[data-a="llego"]');
+      if(bLlego) bLlego.addEventListener("click", () => marcarLlegada(u.id));
       row.querySelector('[data-a="quitar"]')
         .addEventListener("click", () => quitar(u.id, dentro ? "retirada" : "cancelada"));
       list.appendChild(row);
     });
+  }
+
+  /* ---------- marcar llegada a mano ---------- */
+  async function marcarLlegada(id){
+    const { error } = await sb.rpc("marcar_llegada", { p_id: id });
+    if(error){ toast("No se pudo marcar la llegada: "+error.message); return; }
+    await cargar();
+    irTab("predio");
+    render(id);
+    const u = unidades.find(x => x.id === id);
+    toast(u && u.llegada
+      ? "Ingresó "+u.nombre+" a las "+fHora.format(new Date(u.llegada))+"."
+      : "Unidad actualizada.");
   }
 
   /* ---------- sacar del tablero, con deshacer ---------- */
@@ -548,6 +581,34 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
     $("formWrap").classList.add("hide");
     $("paseWrap").classList.remove("hide");
+
+    const lista = visibles.length ? visibles : unidades;
+    const i = lista.findIndex(x => x.id === u.id);
+    const varios = lista.length > 1 && i >= 0;
+    $("pPos").textContent = varios ? "Pase "+(i+1)+" de "+lista.length : "";
+    $("pAnt").disabled = !varios;
+    $("pSig").disabled = !varios;
+  }
+
+  function navegarPase(paso){
+    if(!paseActual) return;
+    const lista = visibles.length ? visibles : unidades;
+    if(!lista.length) return;
+    let i = lista.findIndex(x => x.id === paseActual.id);
+    if(i < 0) i = 0;
+    mostrarPase(lista[(i + paso + lista.length) % lista.length]);
+  }
+
+  async function copiarImagenQR(){
+    const canvas = $("pQR").querySelector("canvas");
+    if(!canvas){ toast("No hay código que copiar."); return; }
+    try{
+      const blob = await new Promise(res => canvas.toBlob(res, "image/png"));
+      await navigator.clipboard.write([ new ClipboardItem({ "image/png": blob }) ]);
+      toast("Imagen del QR copiada. Péguela con Ctrl+V.");
+    }catch(e){
+      toast("Este navegador no deja copiar imágenes. Use Copiar enlace.");
+    }
   }
   function verPase(id){
     const u = unidades.find(x => x.id === id);
@@ -769,6 +830,9 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   });
 
   $("pNueva").addEventListener("click", volverForm);
+  $("pAnt").addEventListener("click", () => navegarPase(-1));
+  $("pSig").addEventListener("click", () => navegarPase(1));
+  $("pCopiarQR").addEventListener("click", copiarImagenQR);
   $("pAbrir").addEventListener("click", () => {
     if(!paseActual) return;
     location.hash = linkPase(paseActual).split("#")[1] ? "#"+linkPase(paseActual).split("#")[1] : "";
